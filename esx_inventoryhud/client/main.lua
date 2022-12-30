@@ -40,6 +40,12 @@ function openInventory()
     SetNuiFocus(true, true)
 end
 
+RegisterNetEvent("esx_inventoryhud:equipArmor")
+AddEventHandler("esx_inventoryhud:equipArmor", function()
+    local playerPed = PlayerPedId()
+    SetPedArmour(playerPed, 100)
+end)
+
 RegisterNetEvent("esx_inventoryhud:doClose")
 AddEventHandler("esx_inventoryhud:doClose", function()
     closeInventory()

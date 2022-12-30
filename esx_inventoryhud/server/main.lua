@@ -21,6 +21,13 @@ ESX.RegisterServerCallback(
 	end
 )
 
+ESX.RegisterUsableItem('armor', function(source)
+	local xPlayer = ESX.GetPlayerFromId(source)
+	xPlayer.removeInventoryItem('armor', 1)
+	TriggerClientEvent('esx_inventoryhud:equipArmor', source)
+	xPlayer.showNotification('Du hast eine Rüstung angezogen.')
+end)
+
 RegisterServerEvent("esx_inventoryhud:tradePlayerItem")
 AddEventHandler(
 	"esx_inventoryhud:tradePlayerItem",
