@@ -4,17 +4,17 @@ var disabledFunction = null;
 
 window.addEventListener("message", function (event) {
     if (event.data.action == "display") {
-        type = event.data.type;
+        type = event.data.type
         disabled = false;
 
-        if (type === "normal") {
+		if (type === "normal") {
             $(".info-div").hide();
         } else if (type === "trunk") {
             $(".info-div").show();
         } else if (type === "property") {
             $(".info-div").hide();
-        } else if (type === "storage") {
-            $(".info-div").hide();
+        } else if (type === "glovebox") {
+            $(".info-div").show();
         } else if (type === "player") {
             $(".info-div").show();
         } else if (type === "shop") {
@@ -28,8 +28,6 @@ window.addEventListener("message", function (event) {
         $(".item").remove();
         $("#otherInventory").html("<div id=\"noSecondInventoryMessage\"></div>");
         $("#noSecondInventoryMessage").html(invLocale.secondInventoryNotAvailable);
-    } else if (event.data.action == "setType") {
-        type = event.data.type;
     } else if (event.data.action == "setItems") {
         inventorySetup(event.data.itemList);
 
@@ -40,8 +38,7 @@ window.addEventListener("message", function (event) {
             revert: 'invalid',
             start: function (event, ui) {
                 if (disabled) {
-                    $(this).stop();
-                    return;
+                    return false;
                 }
 
                 $(this).css('background-image', 'none');
@@ -70,13 +67,15 @@ window.addEventListener("message", function (event) {
         });
     } else if (event.data.action == "setSecondInventoryItems") {
         secondInventorySetup(event.data.itemList);
+    } else if (event.data.action == "setShopInventoryItems") {
+        shopInventorySetup(event.data.itemList);
     } else if (event.data.action == "setInfoText") {
         $(".info-div").html(event.data.text);
     } else if (event.data.action == "nearPlayers") {
         $("#nearPlayers").html("");
 
         $.each(event.data.players, function (index, player) {
-            $("#nearPlayers").append('<button class="nearbyPlayerButton" data-player="' + player.player + '">ID ' + player.player + '</button>');
+            $("#nearPlayers").append('<button class="nearbyPlayerButton" data-player="' + player.player + '">' + player.label + ' (' + player.player + ')</button>');
         });
 
         $("#dialog").dialog("open");
@@ -94,28 +93,15 @@ window.addEventListener("message", function (event) {
 });
 
 function closeInventory() {
-    $.post("http://esx_inventoryhud/NUIFocusOff", JSON.stringify({
-        type: type
-    }));
+    $.post("http://esx_inventoryhud/NUIFocusOff", JSON.stringify({}));
 }
 
 function inventorySetup(items) {
     $("#playerInventory").html("");
     $.each(items, function (index, item) {
-        count = setCount(item, false);
+        count = setCount(item);
 
-        var bgColor = "none";
-        if (item.rare !== undefined) {
-            if (item.rare == 1) {
-                bgColor = "rgba(205, 127, 50, 0.4)";
-            } else if (item.rare == 2) {
-                bgColor = "rgba(192, 192, 192, 0.4)";
-            } else if (item.rare == 3) {
-                bgColor = "rgba(218, 165, 32, 0.4)";
-            }
-        }
-
-        $("#playerInventory").append('<div class="slot" style="background-color: ' + bgColor + ';"><div id="item-' + index + '" class="item" style = "background-image: url(\'img/items/' + item.name + '.png\')">' +
+        $("#playerInventory").append('<div class="slot"><div id="item-' + index + '" class="item" style = "background-image: url(\'img/items/' + item.name + '.png\')">' +
             '<div class="item-count">' + count + '</div> <div class="item-name">' + item.label + '</div> </div ><div class="item-name-bg"></div></div>');
         $('#item-' + index).data('item', item);
         $('#item-' + index).data('inventory', "main");
@@ -125,20 +111,24 @@ function inventorySetup(items) {
 function secondInventorySetup(items) {
     $("#otherInventory").html("");
     $.each(items, function (index, item) {
-        count = setCount(item, true);
+        count = setCount(item);
 
-        var bgColor = "none";
-        if (item.rare !== undefined) {
-            if (item.rare == 1) {
-                bgColor = "rgba(205, 127, 50, 0.4)";
-            } else if (item.rare == 2) {
-                bgColor = "rgba(192, 192, 192, 0.4)";
-            } else if (item.rare == 3) {
-                bgColor = "rgba(218, 165, 32, 0.4)";
-            }
-        }
-        $("#otherInventory").append('<div class="slot" style="background-color: ' + bgColor + ';"><div id="itemOther-' + index + '" class="item" style = "background-image: url(\'img/items/' + item.name + '.png\')">' +
+        $("#otherInventory").append('<div class="slot"><div id="itemOther-' + index + '" class="item" style = "background-image: url(\'img/items/' + item.name + '.png\')">' +
             '<div class="item-count">' + count + '</div> <div class="item-name">' + item.label + '</div> </div ><div class="item-name-bg"></div></div>');
+        $('#itemOther-' + index).data('item', item);
+        $('#itemOther-' + index).data('inventory', "second");
+    });
+}
+
+
+function shopInventorySetup(items) {
+    $("#otherInventory").html("");
+    $.each(items, function (index, item) {
+        //count = setCount(item)
+        cost = setCost(item);
+
+        $("#otherInventory").append('<div class="slot"><div id="itemOther-' + index + '" class="item" style = "background-image: url(\'img/items/' + item.name + '.png\')">' +
+            '<div class="item-count">' + cost + '</div> <div class="item-name">' + item.label + '</div> </div ><div class="item-name-bg"></div></div>');
         $('#itemOther-' + index).data('item', item);
         $('#itemOther-' + index).data('inventory', "second");
     });
@@ -180,17 +170,12 @@ function disableInventory(ms) {
     }
 }
 
-function setCount(item, second) {
-    if (second && type === "shop") {
-        return "$" + formatMoney(item.price);
-    }
-
+function setCount(item) {
     count = item.count
 
     if (item.limit > 0) {
-        count = item.count + " / " + item.limit;
+        count = item.count + " / " + item.limit
     }
-
 
     if (item.type === "item_weapon") {
         if (count == 0) {
@@ -205,6 +190,18 @@ function setCount(item, second) {
     }
 
     return count;
+}
+
+function setCost(item) {
+    cost = item.price
+
+    if (item.price == 0){
+        cost = "$" + item.price
+    }
+    if (item.price > 0) {
+        cost = "$" + item.price
+    }
+    return cost;
 }
 
 function formatMoney(n, c, d, t) {
@@ -257,27 +254,6 @@ $(document).ready(function () {
         }
     });
 
-    $('#playerInventory').on('dblclick', '.item', function () {
-        itemData = $(this).data("item");
-
-        if (itemData == undefined || itemData.usable == undefined) {
-            return;
-        }
-
-        itemInventory = $(this).data("inventory");
-
-        if (itemInventory == undefined || itemInventory == "second") {
-            return;
-        }
-
-        if (itemData.usable) {
-            disableInventory(300);
-            $.post("http://esx_inventoryhud/UseItem", JSON.stringify({
-                item: itemData
-            }));
-        }
-    });
-
     $('#give').droppable({
         hoverClass: 'hoverControl',
         drop: function (event, ui) {
@@ -326,8 +302,8 @@ $(document).ready(function () {
             }
         }
     });
-
-    $('#playerInventory').droppable({
+	
+$('#playerInventory').droppable({
         drop: function (event, ui) {
             itemData = ui.draggable.data("item");
             itemInventory = ui.draggable.data("inventory");
@@ -338,21 +314,15 @@ $(document).ready(function () {
                     item: itemData,
                     number: parseInt($("#count").val())
                 }));
-            } else if (type === "shop" && itemInventory === "second") {
-                disableInventory(500);
-                $.post("http://esx_inventoryhud/BuyItem", JSON.stringify({
-                    item: itemData,
-                    number: parseInt($("#count").val())
-                }));
             } else if (type === "property" && itemInventory === "second") {
                 disableInventory(500);
                 $.post("http://esx_inventoryhud/TakeFromProperty", JSON.stringify({
                     item: itemData,
                     number: parseInt($("#count").val())
                 }));
-            } else if (type === "storage" && itemInventory === "second") {
+            } else if (type === "glovebox" && itemInventory === "second") {
                 disableInventory(500);
-                $.post("http://esx_inventoryhud/TakeFromStorage", JSON.stringify({
+                $.post("http://esx_inventoryhud/TakeFromGlovebox", JSON.stringify({
                     item: itemData,
                     number: parseInt($("#count").val())
                 }));
@@ -362,11 +332,17 @@ $(document).ready(function () {
                     item: itemData,
                     number: parseInt($("#count").val())
                 }));
+            } else if (type === "shop" && itemInventory === "second") {
+                disableInventory(500);
+                $.post("http://esx_inventoryhud/TakeFromShop", JSON.stringify({
+                    item: itemData,
+                    number: parseInt($("#count").val())
+                }));
             }
         }
     });
 
-    $('#otherInventory').droppable({
+$('#otherInventory').droppable({
         drop: function (event, ui) {
             itemData = ui.draggable.data("item");
             itemInventory = ui.draggable.data("inventory");
@@ -383,9 +359,9 @@ $(document).ready(function () {
                     item: itemData,
                     number: parseInt($("#count").val())
                 }));
-            } else if (type === "storage" && itemInventory === "main") {
+            } else if (type === "glovebox" && itemInventory === "main") {
                 disableInventory(500);
-                $.post("http://esx_inventoryhud/PutIntoStorage", JSON.stringify({
+                $.post("http://esx_inventoryhud/PutIntoGlovebox", JSON.stringify({
                     item: itemData,
                     number: parseInt($("#count").val())
                 }));

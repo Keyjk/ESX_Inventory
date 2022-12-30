@@ -1,17 +1,18 @@
-fx_version "adamant"
-game "gta5"
+fx_version 'adamant'
 
-author "Trsak"
+game 'gta5'
 
-description "ESX trunk inventory"
+description 'Inventory HUD Trunk'
 
-version "2.4.0"
+version '1.2.1'
+
 
 server_scripts {
   "@async/async.lua",
   "@mysql-async/lib/MySQL.lua",
   "@es_extended/locale.lua",
-  "locales/*.lua",
+  "locales/de.lua",
+  "locales/en.lua",
   "config.lua",
   "server/classes/c_trunk.lua",
   "server/trunk.lua",
@@ -20,7 +21,9 @@ server_scripts {
 
 client_scripts {
   "@es_extended/locale.lua",
-  "locales/*.lua",
+  "locales/de.lua",
+  "locales/en.lua",
   "config.lua",
   "client/esx_trunk-cl.lua"
 }
+

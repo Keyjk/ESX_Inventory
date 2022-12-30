@@ -1,32 +1,37 @@
-fx_version "adamant"
-game "gta5"
+fx_version 'adamant'
 
-author "Trsak"
+game 'gta5'
 
-description "ESX Inventory HUD"
+description 'Inventory HUD'
 
-version "2.4.0"
+version '1.2.1'
 
-ui_page "html/ui.html"
+server_scripts {
+  '@mysql-async/lib/MySQL.lua',
+  "@es_extended/locale.lua",
+  "server/main.lua",
+  "locales/de.lua",
+  "locales/en.lua",
+  "config.lua"
+}
 
 client_scripts {
   "@es_extended/locale.lua",
   "client/main.lua",
+  "client/shop.lua",	
   "client/trunk.lua",
+  "client/glovebox.lua",
+  "client/beds.lua",
+  "client/motels.lua",
   "client/property.lua",
   "client/player.lua",
-  "client/shops.lua",
-  "client/storage.lua",
-  "locales/*.lua",
+  "locales/de.lua",
+  "locales/en.lua",
   "config.lua"
 }
 
-server_scripts {
-  "@es_extended/locale.lua",
-  "server/main.lua",
-  "server/storage.lua",
-  "locales/*.lua",
-  "config.lua"
+ui_page {
+	'html/ui.html'
 }
 
 files {
@@ -36,9 +41,13 @@ files {
   "html/js/inventory.js",
   "html/js/config.js",
   -- JS LOCALES
-  "html/locales/*.js",
+  "html/locales/en.js",
+  "html/locales/de.js",
   -- IMAGES
-  "html/img/bullet.png",
-  -- ICONS
-  "html/img/items/*.png"
+  "html/img/*.png",
+  "html/img/items/*.png",
+}
+
+dependencies {
+	'es_extended'
 }

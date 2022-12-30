@@ -24,15 +24,18 @@ AddEventHandler(
 )
 
 RegisterNetEvent("esx_inventoryhud:openPlayerInventory")
-AddEventHandler(
-    "esx_inventoryhud:openPlayerInventory",
-    function(target, playerName)
-        targetPlayer = target
-        targetPlayerName = playerName
-        setPlayerInventoryData()
-        openPlayerInventory()
-    end
-)
+AddEventHandler("esx_inventoryhud:openPlayerInventory", function(target, playerName)
+	PlayerData = ESX.GetPlayerData()
+	if PlayerData.job and PlayerData.job.name == 'police' or PlayerData.job.name == 'ambulance' then
+        	targetPlayer = target
+        	targetPlayerName = playerName
+        	setPlayerInventoryData()
+        	openPlayerInventory()
+	else
+		ESX.ShowNotification('Bad boy. -nertigel')
+		-- add discord log if you would like to fag
+	end
+end)
 
 function refreshPlayerInventory()
     setPlayerInventoryData()
@@ -108,9 +111,9 @@ function setPlayerInventoryData()
             if Config.IncludeWeapons and weapons ~= nil then
                 for key, value in pairs(weapons) do
                     local weaponHash = GetHashKey(weapons[key].name)
-                    local playerPed = GetPlayerPed(GetPlayerFromServerId(targetPlayer))
+                    local playerPed = PlayerPedId()
                     if weapons[key].name ~= "WEAPON_UNARMED" then
-                        local ammo = weapons[key].ammo
+                        local ammo = GetAmmoInPedWeapon(playerPed, weaponHash)
                         table.insert(
                             items,
                             {
@@ -164,7 +167,7 @@ RegisterNUICallback(
             local count = tonumber(data.number)
 
             if data.item.type == "item_weapon" then
-                count = data.item.count
+                count = GetAmmoInPedWeapon(PlayerPedId(), GetHashKey(data.item.name))
             end
 
             TriggerServerEvent("esx_inventoryhud:tradePlayerItem", GetPlayerServerId(PlayerId()), targetPlayer, data.item.type, data.item.name, count)
@@ -189,7 +192,7 @@ RegisterNUICallback(
             local count = tonumber(data.number)
 
             if data.item.type == "item_weapon" then
-                count = data.item.count
+                count = GetAmmoInPedWeapon(PlayerPedId(), GetHashKey(data.item.name))
             end
 
             TriggerServerEvent("esx_inventoryhud:tradePlayerItem", targetPlayer, GetPlayerServerId(PlayerId()), data.item.type, data.item.name, count)

@@ -1,143 +1,243 @@
 ESX = nil
-local currentVehicle = nil
+local GUI = {}
+local PlayerData = {}
+local lastVehicle = nil
+local lastOpen = false
+GUI.Time = 0
+local vehiclePlate = {}
+local arrayWeight = Config.localWeight
+local CloseToVehicle = false
+local entityWorld = nil
+local globalplate = nil
+local lastChecked = 0
 
-Citizen.CreateThread(
-    function()
-        while ESX == nil do
-            TriggerEvent(
-                "esx:getSharedObject",
-                function(obj)
-                    ESX = obj
-                end
-            )
-            Citizen.Wait(0)
-        end
-    end
+Citizen.CreateThread(function()
+	while ESX == nil do
+		TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
+		Citizen.Wait(0)
+	end
+
+	while ESX.GetPlayerData().job == nil do
+		Citizen.Wait(10)
+	end
+
+	PlayerData = ESX.GetPlayerData()
+end)
+
+
+RegisterNetEvent("esx:playerLoaded")
+AddEventHandler(
+  "esx:playerLoaded",
+  function(xPlayer)
+    PlayerData = xPlayer
+    TriggerServerEvent("esx_trunk_inventory:getOwnedVehicule")
+    lastChecked = GetGameTimer()
+  end
 )
 
-function getVehicleInDirection(range)
-    local coordA = GetEntityCoords(GetPlayerPed(-1), 1)
-    local coordB = GetOffsetFromEntityInWorldCoords(GetPlayerPed(-1), 0.0, range, 0.0)
+AddEventHandler(
+  "onResourceStart",
+  function()
+    PlayerData = xPlayer
+    TriggerServerEvent("esx_trunk_inventory:getOwnedVehicule")
+    lastChecked = GetGameTimer()
+  end
+)
 
-    local rayHandle = CastRayPointToPoint(coordA.x, coordA.y, coordA.z, coordB.x, coordB.y, coordB.z, 10, GetPlayerPed(-1), 0)
-    local a, b, c, d, vehicle = GetRaycastResult(rayHandle)
-    return vehicle
+RegisterNetEvent("esx:setJob")
+AddEventHandler("esx:setJob", function(job)
+	local PlayerData = ESX.GetPlayerData()
+	
+	if PlayerData == nil then
+		print ('Kofferbak kan beroep niet synchroniseren. Dit is niet erg.')  -- Cannot sync job, not bad
+	else
+		print ('Kofferbak heeft je beroep gesynchroniseerd.') -- Can sync job
+		PlayerData.job = job
+	end
+end)
+
+RegisterNetEvent("esx_trunk_inventory:setOwnedVehicule")
+AddEventHandler(
+  "esx_trunk_inventory:setOwnedVehicule",
+  function(vehicle)
+    vehiclePlate = vehicle
+    --print("vehiclePlate: ", ESX.DumpTable(vehiclePlate))
+  end
+)
+
+function getItemyWeight(item)
+  local weight = 0
+  local itemWeight = 0
+  if item ~= nil then
+    itemWeight = Config.DefaultWeight
+    if arrayWeight[item] ~= nil then
+      itemWeight = arrayWeight[item]
+    end
+  end
+  return itemWeight
+end
+
+function VehicleInFront()
+  local pos = GetEntityCoords(GetPlayerPed(-1))
+  local entityWorld = GetOffsetFromEntityInWorldCoords(GetPlayerPed(-1), 0.0, 4.0, 0.0)
+  local rayHandle = CastRayPointToPoint(pos.x, pos.y, pos.z, entityWorld.x, entityWorld.y, entityWorld.z, 10, GetPlayerPed(-1), 0)
+  local a, b, c, d, result = GetRaycastResult(rayHandle)
+  return result
 end
 
 function openmenuvehicle()
-    local playerPed = PlayerPedId()
-    local coords = GetEntityCoords(playerPed)
-    local vehicle = nil
+  local playerPed = GetPlayerPed(-1)
+  local coords = GetEntityCoords(playerPed)
+  local vehicle = VehicleInFront()
+  globalplate = GetVehicleNumberPlateText(vehicle)
 
-    if IsPedInAnyVehicle(playerPed, false) then
-        vehicle = GetVehiclePedIsIn(playerPed, false)
-    else
-        vehicle = getVehicleInDirection(3.0)
+  if not IsPedInAnyVehicle(playerPed) then
+    myVeh = false
+    local thisVeh = VehicleInFront()
+    PlayerData = ESX.GetPlayerData()
 
-        if not DoesEntityExist(vehicle) then
-            vehicle = GetClosestVehicle(coords, 3.0, 0, 70)
+    for i = 1, #vehiclePlate do
+      local vPlate = all_trim(vehiclePlate[i].plate)
+      local vFront = all_trim(GetVehicleNumberPlateText(thisVeh))
+      --print('vPlate: ',vPlate)
+      --print('vFront: ',vFront)
+      --if vehiclePlate[i].plate == GetVehicleNumberPlateText(vehFront) then
+      if vPlate == vFront then
+        myVeh = true
+      elseif lastChecked < GetGameTimer() - 60000 then
+        TriggerServerEvent("esx_trunk_inventory:getOwnedVehicule")
+        lastChecked = GetGameTimer()
+        Wait(2000)
+        for i = 1, #vehiclePlate do
+          local vPlate = all_trim(vehiclePlate[i].plate)
+          local vFront = all_trim(GetVehicleNumberPlateText(thisVeh))
+          if vPlate == vFront then
+            myVeh = true
+          end
         end
+      end
     end
 
-    if DoesEntityExist(vehicle) then
-        local lockStatus = GetVehicleDoorLockStatus(vehicle)
-        if lockStatus == 0 or lockStatus == 1 then
-            local trunkpos = GetWorldPositionOfEntityBone(vehicle, GetEntityBoneIndexByName(vehicle, "boot"))
-            local distanceToTrunk = GetDistanceBetweenCoords(coords, trunkpos, 1)
+    if not Config.CheckOwnership or (Config.AllowPolice and PlayerData.job.name == "police") or (Config.CheckOwnership and myVeh) then
+      if globalplate ~= nil or globalplate ~= "" or globalplate ~= " " then
+        CloseToVehicle = true
+        local vehFront = VehicleInFront()
+        local x, y, z = table.unpack(GetEntityCoords(GetPlayerPed(-1), true))
+        local closecar = GetClosestVehicle(x, y, z, 4.0, 0, 71)
 
-            if distanceToTrunk <= 2.0 or (trunkpos.x + trunkpos.y + trunkpos.z) == 0.0 then
-                TriggerEvent(
-                    "mythic_progbar:client:progress",
-                    {
-                        name = "Open_Trunk",
-                        duration = Config.OpenTime,
-                        label = _U("trunk_opening"),
-                        useWhileDead = false,
-                        canCancel = true,
-                        controlDisables = {
-                            disableMovement = true,
-                            disableCarMovement = true,
-                            disableMouse = false,
-                            disableCombat = true
-                        }
-                    },
-                    function(status)
-                        if not status then
-                            currentVehicle = vehicle
-                            SetVehicleDoorOpen(vehicle, 5, false, false)
-                            local class = GetVehicleClass(vehicle)
-                            OpenCoffreInventoryMenu(GetVehicleNumberPlateText(vehicle), Config.VehicleLimit[class])
-                        end
-                    end
-                )
+        if vehFront > 0 and closecar ~= nil and GetPedInVehicleSeat(closecar, -1) ~= GetPlayerPed(-1) then
+          lastVehicle = vehFront
+          local model = GetDisplayNameFromVehicleModel(GetEntityModel(closecar))
+          local locked = GetVehicleDoorLockStatus(closecar)
+          local class = GetVehicleClass(vehFront)
+          ESX.UI.Menu.CloseAll()
+
+          if ESX.UI.Menu.IsOpen("default", GetCurrentResourceName(), "inventory") then
+            SetVehicleDoorShut(vehFront, 5, false)
+          else
+            if locked == 1 or class == 15 or class == 16 or class == 14 then
+              SetVehicleDoorOpen(vehFront, 5, false, false)
+              ESX.UI.Menu.CloseAll()
+
+              if globalplate ~= nil or globalplate ~= "" or globalplate ~= " " then
+                CloseToVehicle = true
+                OpenCoffreInventoryMenu(GetVehicleNumberPlateText(vehFront), Config.VehicleWeight[class], myVeh)
+              end
             else
-                exports.pNotify:SendNotification({text = _U("trunk_nonear"), type = "error", timeout = 5000})
+           
+            exports['b1g_notify']:Notify('true', _U("trunk_closed"))
             end
+          end
         else
-            exports.pNotify:SendNotification({text = _U("trunk_locked"), type = "error", timeout = 5000})
+         
+            exports['b1g_notify']:Notify('false', _U("no_veh_nearby"))
         end
+        lastOpen = true
+        GUI.Time = GetGameTimer()
+      end
     else
-        exports.pNotify:SendNotification({text = _U("no_veh_nearby"), type = "error", timeout = 5000})
+      -- Not their vehicle
+    
+            exports['b1g_notify']:Notify('false', _U("nacho_veh"))
     end
+  end
 end
-
 local count = 0
 
+-- Key controls
 Citizen.CreateThread(
-    function()
-        while true do
-            Wait(1)
-            if IsControlJustReleased(0, Config.OpenKey) and currentVehicle == nil and not IsPedInAnyVehicle(PlayerPedId(), true) then
-                openmenuvehicle()
-            end
-        end
+  function()
+    while true do
+      Wait(0)
+      if IsControlJustReleased(0, Config.OpenKey) and (GetGameTimer() - GUI.Time) > 1000 then
+        openmenuvehicle()
+        GUI.Time = GetGameTimer()
+      end
     end
+  end
 )
 
-function OpenCoffreInventoryMenu(plate, max)
-    ESX.TriggerServerCallback(
-        "esx_inventoryhud_trunk:getInventoryV",
-        function(inventory)
-            text = _U("trunk_info", plate, (inventory.weight / 1000), (max / 1000))
-            data = {plate = plate, max = max, text = text}
-            TriggerEvent("esx_inventoryhud:openTrunkInventory", data, inventory.blackMoney, inventory.items, inventory.weapons)
-        end,
-        plate
-    )
-end
+Citizen.CreateThread(
+  function()
+    while true do
+      Wait(0)
+      local pos = GetEntityCoords(GetPlayerPed(-1))
+      if CloseToVehicle then
+        local vehicle = GetClosestVehicle(pos["x"], pos["y"], pos["z"], 2.0, 0, 70)
+        if DoesEntityExist(vehicle) then
+          CloseToVehicle = true
+        else
+          CloseToVehicle = false
+          lastOpen = false
+          ESX.UI.Menu.CloseAll()
+          SetVehicleDoorShut(lastVehicle, 5, false)
+        end
+      end
+    end
+  end
+)
 
-RegisterNetEvent("esx_inventoryhud:onClosedInventory")
+RegisterNetEvent("esx:playerLoaded")
 AddEventHandler(
-    "esx_inventoryhud:onClosedInventory",
-    function(type)
-        if type == "trunk" then
-            closeTrunk()
-        end
-    end
+  "esx:playerLoaded",
+  function(xPlayer)
+    PlayerData = xPlayer
+    TriggerServerEvent("esx_trunk_inventory:getOwnedVehicule")
+    lastChecked = GetGameTimer()
+  end
 )
 
-function closeTrunk()
-    if currentVehicle ~= nil then
-        SetVehicleDoorShut(currentVehicle, 5, false)
-    end
-
-    currentVehicle = nil
+function OpenCoffreInventoryMenu(plate, max, myVeh)
+  ESX.TriggerServerCallback(
+    "esx_trunk:getInventoryV",
+    function(inventory)
+      text = _U("trunk_info", plate, (inventory.weight / 100), (max / 100))
+      data = {plate = plate, max = max, myVeh = myVeh, text = text}
+      TriggerEvent("esx_inventoryhud:openTrunkInventory", data, inventory.blackMoney, inventory.cashMoney, inventory.items, inventory.weapons)
+    end,
+    plate
+  )
 end
 
-Citizen.CreateThread(
-    function()
-        while true do
-            Wait(500)
-            if currentVehicle ~= nil and DoesEntityExist(currentVehicle) then
-                local playerPed = PlayerPedId()
-                local coords = GetEntityCoords(playerPed)
-                local vehicleCoords = GetEntityCoords(currentVehicle)
-                local distance = GetDistanceBetweenCoords(coords, vehicleCoords, 1)
+function all_trim(s)
+  if s then
+    return s:match "^%s*(.*)":match "(.-)%s*$"
+  else
+    return "noTagProvided"
+  end
+end
 
-                if distance > 4.0 then
-                    TriggerEvent("esx_inventoryhud:closeInventory")
-                end
-            end
-        end
+function dump(o)
+  if type(o) == "table" then
+    local s = "{ "
+    for k, v in pairs(o) do
+      if type(k) ~= "number" then
+        k = '"' .. k .. '"'
+      end
+      s = s .. "[" .. k .. "] = " .. dump(v) .. ","
     end
-)
+    return s .. "} "
+  else
+    return tostring(o)
+  end
+end
